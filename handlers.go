@@ -16,6 +16,7 @@ func CreateNoteHandler(w http.ResponseWriter, r *http.Request) {
 	// Decode JSON request body into the payload struct
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "fail",
 			"message": err.Error(),
@@ -27,6 +28,7 @@ func CreateNoteHandler(w http.ResponseWriter, r *http.Request) {
 	errors := ValidateStruct(&payload)
 	if errors != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(errors)
 		return
 	}
@@ -44,7 +46,8 @@ func CreateNoteHandler(w http.ResponseWriter, r *http.Request) {
 	// Save new note to the database
 	result := DB.Create(&newNote)
 	if result.Error != nil {
-		if strings.Contains(result.Error.Error(), "Duplicate entry") {
+		if strings.Contains(result.Error.Error(), "UNIQUE constraint failed") {
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"status":  "fail",
@@ -52,6 +55,7 @@ func CreateNoteHandler(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadGateway)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "error",
@@ -61,6 +65,7 @@ func CreateNoteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return success response
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "success",
@@ -128,6 +133,7 @@ func UpdateNote(w http.ResponseWriter, r *http.Request) {
 				"status":  "fail",
 				"message": "No note with that ID exists",
 			}
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
 			json.NewEncoder(w).Encode(errorResponse)
 			return
@@ -171,6 +177,7 @@ func FindNoteById(w http.ResponseWriter, r *http.Request) {
 	result := DB.First(&note, "id = ?", noteID)
 	if err := result.Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
 			response := map[string]interface{}{
 				"status":  "fail",
@@ -179,6 +186,7 @@ func FindNoteById(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(response)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadGateway)
 		response := map[string]interface{}{
 			"status":  "fail",
@@ -205,6 +213,7 @@ func DeleteNote(w http.ResponseWriter, r *http.Request) {
 	result := DB.Delete(&Note{}, "id = ?", noteID)
 
 	if result.RowsAffected == 0 {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
 		response := map[string]interface{}{
 			"status":  "fail",
@@ -213,6 +222,7 @@ func DeleteNote(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(response)
 		return
 	} else if result.Error != nil {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadGateway)
 		response := map[string]interface{}{
 			"status":  "error",
@@ -221,4 +231,12 @@ func DeleteNote(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(response)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Note deleted successfully",
+	}
+	json.NewEncoder(w).Encode(response)
 }
